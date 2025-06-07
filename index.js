@@ -2,7 +2,7 @@
 class EYE extends HTMLElement {
     video_polling = false;
     flipped = false;
-    eye_size = 768;
+    eye_size = 900;
     contrast = 100;
     saturation = 100; 
     brightness = 100;
@@ -283,7 +283,6 @@ class EYE extends HTMLElement {
     }
 
     async createBottomDeviceDropdown(container){
-      const connected_devices = [...await navigator.mediaDevices.enumerateDevices()].filter(d => d.kind === 'videoinput');
       const selection_wrapper = document.createElement('div');
       selection_wrapper.style.cssText = `
         background: rgba(0, 0, 0, 0.8);
@@ -303,22 +302,85 @@ class EYE extends HTMLElement {
         border: none;
       `;
       
-      for (let device_index in connected_devices) {
-        const device = connected_devices[device_index];
-        const option = document.createElement('option');
-        option.setAttribute('value', device.deviceId);
-        option.innerText = device.label || `Camera ${parseInt(device_index) + 1}`;
-        video_inputs.appendChild(option);
-      }
+      // Store reference for later updates
+      this.camera_select = video_inputs;
+      
       video_inputs.addEventListener('change', (e) => {
         this.selected_device = e.target.value;
-        console.log(this.selected_device);
+        console.log('Selected camera device:', this.selected_device);
         this.getUserMedia();
       });
       
       selection_wrapper.appendChild(selection_label);
       selection_wrapper.appendChild(video_inputs);
       container.appendChild(selection_wrapper);
+
+      // Populate the dropdown with available cameras
+      await this.updateCameraList();
+    }
+
+    async updateCameraList() {
+      try {
+        // First, request permissions to get full device info
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        // Stop the stream immediately, we just needed permission
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Now enumerate devices with proper labels
+        const connected_devices = await navigator.mediaDevices.enumerateDevices();
+        const video_devices = connected_devices.filter(d => d.kind === 'videoinput');
+        
+        console.log('Available video devices:', video_devices);
+        
+        // Clear existing options
+        this.camera_select.innerHTML = '';
+        
+        // Add devices to dropdown
+        video_devices.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.setAttribute('value', device.deviceId);
+          
+          // Use device label if available, otherwise create a descriptive name
+          let deviceName = device.label;
+          if (!deviceName || deviceName === '') {
+            // On mobile, try to identify front/back cameras
+            if (device.deviceId.includes('front') || index === 1) {
+              deviceName = `Front Camera ${index + 1}`;
+            } else if (device.deviceId.includes('back') || index === 0) {
+              deviceName = `Back Camera ${index + 1}`;
+            } else {
+              deviceName = `Camera ${index + 1}`;
+            }
+          }
+          
+          option.innerText = deviceName;
+          this.camera_select.appendChild(option);
+        });
+
+        // Set the first device as selected if none is selected
+        if (!this.selected_device && video_devices.length > 0) {
+          this.selected_device = video_devices[0].deviceId;
+          this.camera_select.value = this.selected_device;
+        }
+        
+      } catch (error) {
+        console.error('Error getting camera permissions or enumerating devices:', error);
+        
+        // Fallback: add generic options for mobile
+        const fallback_options = [
+          { deviceId: '', label: 'Default Camera' },
+          { deviceId: 'front', label: 'Front Camera' },
+          { deviceId: 'back', label: 'Back Camera' }
+        ];
+        
+        this.camera_select.innerHTML = '';
+        fallback_options.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.setAttribute('value', device.deviceId);
+          option.innerText = device.label;
+          this.camera_select.appendChild(option);
+        });
+      }
     }
 
     createBottomExportButton(container){
@@ -501,13 +563,51 @@ class EYE extends HTMLElement {
   
     async getUserMedia() {
       this.stopVideoStream()
-      const constraints = {
-        video: { deviceId: this.selected_device, 
-          width: this.eye_size,
-          height: this.eye_size 
+      
+      let constraints;
+      
+      if (this.selected_device && this.selected_device !== '') {
+        // Specific device selected
+        if (this.selected_device === 'front') {
+          // Mobile front camera
+          constraints = {
+            video: { 
+              facingMode: 'user',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }
+          };
+        } else if (this.selected_device === 'back') {
+          // Mobile back camera
+          constraints = {
+            video: { 
+              facingMode: 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }
+          };
+        } else {
+          // Specific device ID
+          constraints = {
+            video: { 
+              deviceId: { exact: this.selected_device },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }
+          };
         }
-      };
+      } else {
+        // Default camera
+        constraints = {
+          video: { 
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        };
+      }
+      
       try {
+        console.log('Requesting camera with constraints:', constraints);
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         this.video.srcObject = stream;
         this.video.volume = 0;
@@ -515,6 +615,17 @@ class EYE extends HTMLElement {
         this.beginVideoPoll();
       } catch (error) {
         console.error('Error accessing user media:', error);
+        
+        // Fallback to basic video constraints
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          this.video.srcObject = fallbackStream;
+          this.video.volume = 0;
+          this.video.play();
+          this.beginVideoPoll();
+        } catch (fallbackError) {
+          console.error('Fallback camera access also failed:', fallbackError);
+        }
       }
     }
   
@@ -529,7 +640,30 @@ class EYE extends HTMLElement {
     }
   
       async pollVideo() {
-    await this.scratch_canvas_context.drawImage(this.video, 0, 0, this.eye_size, this.eye_size);
+    // Clear the canvas first
+    this.scratch_canvas_context.clearRect(0, 0, this.eye_size, this.eye_size);
+    
+    // Calculate scaling to maintain aspect ratio
+    const videoAspect = this.video.videoWidth / this.video.videoHeight;
+    const canvasAspect = 1; // Square canvas
+    
+    let drawWidth, drawHeight, drawX, drawY;
+    
+    if (videoAspect > canvasAspect) {
+      // Video is wider than canvas - fit by height
+      drawHeight = this.eye_size;
+      drawWidth = drawHeight * videoAspect;
+      drawX = (this.eye_size - drawWidth) / 2;
+      drawY = 0;
+    } else {
+      // Video is taller than canvas - fit by width
+      drawWidth = this.eye_size;
+      drawHeight = drawWidth / videoAspect;
+      drawX = 0;
+      drawY = (this.eye_size - drawHeight) / 2;
+    }
+    
+    await this.scratch_canvas_context.drawImage(this.video, drawX, drawY, drawWidth, drawHeight);
     this.scratch_canvas_context.filter = `saturate(${this.saturation}%) brightness(${this.brightness}%) contrast(${this.contrast}%) hue-rotate(${this.hue}deg)`
     const img_data = await this.scratch_canvas_context.getImageData(0,0,this.eye_size, this.eye_size);
     
