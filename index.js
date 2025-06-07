@@ -12,6 +12,8 @@ class EYE extends HTMLElement {
     color2 = 'orange'; 
     color3 = 'blue';
     color4 = 'pink';
+    color5 = 'red';
+    dither_method = 'floyd-steinberg';
     
     render() {
       const initialize_button = document.createElement('button');
@@ -69,7 +71,7 @@ class EYE extends HTMLElement {
       return closestColor;
     }
 
-    // Apply Floyd-Steinberg dithering
+    // Apply dithering with selected method
     applyDithering(imageData) {
       const data = imageData.data;
       const width = imageData.width;
@@ -81,17 +83,122 @@ class EYE extends HTMLElement {
         this.colorToRgb(this.color1),
         this.colorToRgb(this.color2),
         this.colorToRgb(this.color3),
-        this.colorToRgb(this.color4)
+        this.colorToRgb(this.color4),
+        this.colorToRgb(this.color5)
       ];
 
-      console.log('Dithering with palette:', {
+      console.log('Dithering with method:', this.dither_method, 'and palette:', {
         white: 'white',
         color1: this.color1,
         color2: this.color2,
         color3: this.color3,
         color4: this.color4,
+        color5: this.color5,
         rgbPalette: palette
       });
+
+      if (this.dither_method === 'threshold') {
+        return this.applyThresholdDithering(imageData, palette);
+      } else {
+        return this.applyErrorDiffusionDithering(imageData, palette, this.dither_method);
+      }
+    }
+
+    // Simple threshold dithering (no error diffusion)
+    applyThresholdDithering(imageData, palette) {
+      const data = imageData.data;
+      const width = imageData.width;
+      const height = imageData.height;
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          const oldPixel = [data[idx], data[idx + 1], data[idx + 2]];
+          const newPixel = this.findClosestColor(oldPixel, palette);
+          
+          data[idx] = newPixel[0];     // R
+          data[idx + 1] = newPixel[1]; // G
+          data[idx + 2] = newPixel[2]; // B
+        }
+      }
+      
+      return imageData;
+    }
+
+    // Error diffusion dithering with various algorithms
+    applyErrorDiffusionDithering(imageData, palette, method) {
+      const data = imageData.data;
+      const width = imageData.width;
+      const height = imageData.height;
+
+      // Define error diffusion matrices for different algorithms
+      const diffusionMatrices = {
+        'floyd-steinberg': [
+          { x: 1, y: 0, factor: 7/16 },    // Right
+          { x: -1, y: 1, factor: 3/16 },   // Bottom-left
+          { x: 0, y: 1, factor: 5/16 },    // Bottom
+          { x: 1, y: 1, factor: 1/16 }     // Bottom-right
+        ],
+        'atkinson': [
+          { x: 1, y: 0, factor: 1/8 },    // Right
+          { x: 2, y: 0, factor: 1/8 },    // Right + 1
+          { x: -1, y: 1, factor: 1/8 },   // Bottom-left
+          { x: 0, y: 1, factor: 1/8 },    // Bottom
+          { x: 1, y: 1, factor: 1/8 },    // Bottom-right
+          { x: 0, y: 2, factor: 1/8 }     // Bottom + 1
+        ],
+        'burkes': [
+          { x: 1, y: 0, factor: 8/32 },   // Right
+          { x: 2, y: 0, factor: 4/32 },   // Right + 1
+          { x: -2, y: 1, factor: 2/32 },  // Bottom-left-left
+          { x: -1, y: 1, factor: 4/32 },  // Bottom-left
+          { x: 0, y: 1, factor: 8/32 },   // Bottom
+          { x: 1, y: 1, factor: 4/32 },   // Bottom-right
+          { x: 2, y: 1, factor: 2/32 }    // Bottom-right-right
+        ],
+        'sierra': [
+          { x: 1, y: 0, factor: 5/32 },   // Right
+          { x: 2, y: 0, factor: 3/32 },   // Right + 1
+          { x: -2, y: 1, factor: 2/32 },  // Bottom-left-left
+          { x: -1, y: 1, factor: 4/32 },  // Bottom-left
+          { x: 0, y: 1, factor: 5/32 },   // Bottom
+          { x: 1, y: 1, factor: 4/32 },   // Bottom-right
+          { x: 2, y: 1, factor: 2/32 },   // Bottom-right-right
+          { x: -1, y: 2, factor: 2/32 },  // Bottom-bottom-left
+          { x: 0, y: 2, factor: 3/32 },   // Bottom-bottom
+          { x: 1, y: 2, factor: 2/32 }    // Bottom-bottom-right
+        ],
+        'stucki': [
+          { x: 1, y: 0, factor: 8/42 },   // Right
+          { x: 2, y: 0, factor: 4/42 },   // Right + 1
+          { x: -2, y: 1, factor: 2/42 },  // Bottom-left-left
+          { x: -1, y: 1, factor: 4/42 },  // Bottom-left
+          { x: 0, y: 1, factor: 8/42 },   // Bottom
+          { x: 1, y: 1, factor: 4/42 },   // Bottom-right
+          { x: 2, y: 1, factor: 2/42 },   // Bottom-right-right
+          { x: -2, y: 2, factor: 1/42 },  // Bottom-bottom-left-left
+          { x: -1, y: 2, factor: 2/42 },  // Bottom-bottom-left
+          { x: 0, y: 2, factor: 4/42 },   // Bottom-bottom
+          { x: 1, y: 2, factor: 2/42 },   // Bottom-bottom-right
+          { x: 2, y: 2, factor: 1/42 }    // Bottom-bottom-right-right
+        ],
+        'jarvis': [
+          { x: 1, y: 0, factor: 7/48 },   // Right
+          { x: 2, y: 0, factor: 5/48 },   // Right + 1
+          { x: -2, y: 1, factor: 3/48 },  // Bottom-left-left
+          { x: -1, y: 1, factor: 5/48 },  // Bottom-left
+          { x: 0, y: 1, factor: 7/48 },   // Bottom
+          { x: 1, y: 1, factor: 5/48 },   // Bottom-right
+          { x: 2, y: 1, factor: 3/48 },   // Bottom-right-right
+          { x: -2, y: 2, factor: 1/48 },  // Bottom-bottom-left-left
+          { x: -1, y: 2, factor: 3/48 },  // Bottom-bottom-left
+          { x: 0, y: 2, factor: 5/48 },   // Bottom-bottom
+          { x: 1, y: 2, factor: 3/48 },   // Bottom-bottom-right
+          { x: 2, y: 2, factor: 1/48 }    // Bottom-bottom-right-right
+        ]
+      };
+
+      const matrix = diffusionMatrices[method] || diffusionMatrices['floyd-steinberg'];
 
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -110,20 +217,18 @@ class EYE extends HTMLElement {
           const errorG = oldPixel[1] - newPixel[1];  
           const errorB = oldPixel[2] - newPixel[2];
           
-          // Distribute error to neighboring pixels (Floyd-Steinberg)
-          const distributeError = (x2, y2, factor) => {
+          // Distribute error using the selected algorithm's matrix
+          matrix.forEach(({ x: dx, y: dy, factor }) => {
+            const x2 = x + dx;
+            const y2 = y + dy;
+            
             if (x2 >= 0 && x2 < width && y2 >= 0 && y2 < height) {
               const idx2 = (y2 * width + x2) * 4;
               data[idx2] = Math.max(0, Math.min(255, data[idx2] + errorR * factor));
               data[idx2 + 1] = Math.max(0, Math.min(255, data[idx2 + 1] + errorG * factor));
               data[idx2 + 2] = Math.max(0, Math.min(255, data[idx2 + 2] + errorB * factor));
             }
-          };
-          
-          distributeError(x + 1, y, 7/16);     // Right
-          distributeError(x - 1, y + 1, 3/16); // Bottom-left
-          distributeError(x, y + 1, 5/16);     // Bottom
-          distributeError(x + 1, y + 1, 1/16); // Bottom-right
+          });
         }
       }
       
@@ -223,6 +328,62 @@ class EYE extends HTMLElement {
       this.hue_slider = hue_slider
     }
   
+        createBottomDitherSelector(container){
+      const dither_wrapper = document.createElement('div');
+      dither_wrapper.style.cssText = `
+        background: rgba(0, 0, 0, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      `;
+      
+      const dither_label = document.createElement('label');
+      dither_label.innerText = 'Dithering: ';
+      dither_label.style.cssText = 'margin: 0; font-size: 14px;';
+      
+      const dither_select = document.createElement('select');
+      dither_select.style.cssText = `
+        padding: 5px;
+        border-radius: 3px;
+        border: none;
+        background: white;
+        color: black;
+        font-size: 14px;
+      `;
+      
+      const dither_options = [
+        { value: 'floyd-steinberg', label: 'Floyd-Steinberg' },
+        { value: 'atkinson', label: 'Atkinson' },
+        { value: 'burkes', label: 'Burkes' },
+        { value: 'sierra', label: 'Sierra' },
+        { value: 'stucki', label: 'Stucki' },
+        { value: 'jarvis', label: 'Jarvis-Judice-Ninke' },
+        { value: 'threshold', label: 'Simple Threshold' }
+      ];
+      
+      dither_options.forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option.value;
+        opt.innerText = option.label;
+        dither_select.appendChild(opt);
+      });
+      
+      dither_select.value = this.dither_method;
+      this.dither_select = dither_select;
+      
+      dither_select.addEventListener('change', (e) => {
+        this.dither_method = e.target.value;
+        console.log('Dither method changed to:', this.dither_method);
+      });
+      
+      dither_wrapper.appendChild(dither_label);
+      dither_wrapper.appendChild(dither_select);
+      container.appendChild(dither_wrapper);
+    }
+
     createResetButton(){
       const reset_button_label = document.createElement('label');
       const reset_button = document.createElement('button');
@@ -234,12 +395,12 @@ class EYE extends HTMLElement {
         this.brightness_slider.value = 100;
         this.saturation_slider.value = 100;
         this.hue_slider.value = 0;
-  
+
         this.contrast = 100;
         this.saturation = 100; 
         this.brightness = 100;
         this.hue = 0;
-  
+
       });
     }
   
@@ -267,14 +428,17 @@ class EYE extends HTMLElement {
         left: 50%;
         transform: translateX(-50%);
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        gap: 10px;
+        gap: 15px;
         z-index: 1000;
       `;
 
       // Camera select dropdown
       this.createBottomDeviceDropdown(bottom_container);
+      
+      // Dithering method selector
+      this.createBottomDitherSelector(bottom_container);
       
       // Export layers button
       this.createBottomExportButton(bottom_container);
@@ -386,7 +550,7 @@ class EYE extends HTMLElement {
     createBottomExportButton(container){
       const export_button = document.createElement('button');
       export_button.classList.add('export-layers-button');
-      export_button.innerText = 'Export Risograph Layers';
+      export_button.innerText = 'Export Layers';
       export_button.style.cssText = `
         background: #ff6b35;
         color: white;
@@ -414,6 +578,100 @@ class EYE extends HTMLElement {
       });
 
       container.appendChild(export_button);
+    }
+
+    createColorPicker(){
+      const color_picker_container = document.createElement('div');
+      color_picker_container.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.9);
+        padding: 15px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        z-index: 1000;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      `;
+
+      // Color 1
+      this.createColorInput(color_picker_container, 'Color 1', 'color1', this.color1);
+      
+      // Color 2
+      this.createColorInput(color_picker_container, 'Color 2', 'color2', this.color2);
+      
+      // Color 3
+      this.createColorInput(color_picker_container, 'Color 3', 'color3', this.color3);
+      
+      // Color 4
+      this.createColorInput(color_picker_container, 'Color 4', 'color4', this.color4);
+      
+      // Color 5
+      this.createColorInput(color_picker_container, 'Color 5', 'color5', this.color5);
+
+      this.appendChild(color_picker_container);
+    }
+
+    createColorInput(container, labelText, propertyName, defaultColor) {
+      const color_row = document.createElement('div');
+      color_row.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      `;
+
+      const color_input = document.createElement('input');
+      color_input.type = 'color';
+      color_input.value = this.colorNameToHex(defaultColor);
+      color_input.style.cssText = `
+        width: 40px;
+        height: 30px;
+        border: 2px solid #333;
+        border-radius: 4px;
+        cursor: pointer;
+        background: none;
+      `;
+
+      // Store reference for easy access
+      this[`${propertyName}_input`] = color_input;
+
+      color_input.addEventListener('change', (e) => {
+        const newColor = e.target.value;
+        this[propertyName] = newColor;
+        console.log(`${labelText} changed to:`, newColor);
+        
+        // Update the corresponding attribute
+        const attrName = propertyName.replace(/(\d)/, '-$1');
+        this.setAttribute(attrName, newColor);
+      });
+
+      color_row.appendChild(color_input);
+      container.appendChild(color_row);
+    }
+
+    // Helper function to convert color names to hex values
+    colorNameToHex(colorName) {
+      // If it's already a hex color, return it
+      if (colorName.startsWith('#')) {
+        return colorName;
+      }
+
+      // Convert named colors to hex using canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = colorName;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      
+      // Convert RGB to hex
+      return '#' + [r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      }).join('');
     }
   
   
@@ -465,6 +723,9 @@ class EYE extends HTMLElement {
 
       // Create bottom controls container
       this.createBottomControls();
+      
+      // Create color picker menu
+      this.createColorPicker();
     }
   
     async getJpeg() {
@@ -482,7 +743,7 @@ class EYE extends HTMLElement {
       return image_data
     }
 
-    // Export 4 risograph layers as separate PNG files
+    // Export 5 risograph layers as separate PNG files
     async exportRisographLayers() {
       // Get the current dithered image data
       const imageData = this.final_canvas_context.getImageData(0, 0, this.eye_size, this.eye_size);
@@ -496,12 +757,13 @@ class EYE extends HTMLElement {
         this.colorToRgb(this.color1),
         this.colorToRgb(this.color2),
         this.colorToRgb(this.color3),
-        this.colorToRgb(this.color4)
+        this.colorToRgb(this.color4),
+        this.colorToRgb(this.color5)
       ];
 
-      const colorNames = ['white', this.color1, this.color2, this.color3, this.color4];
+      const colorNames = ['white', this.color1, this.color2, this.color3, this.color4, this.color5];
 
-      // Create 4 layers (skip white/paper layer)
+      // Create 5 layers (skip white/paper layer)
       for (let layerIndex = 1; layerIndex < palette.length; layerIndex++) {
         const layerCanvas = document.createElement('canvas');
         layerCanvas.width = width;
@@ -551,7 +813,7 @@ class EYE extends HTMLElement {
         }, 'image/png');
       }
 
-      console.log('Exported 4 risograph layers:', colorNames.slice(1));
+      console.log('Exported 5 risograph layers:', colorNames.slice(1));
     }
   
     async takePicture(){
@@ -691,6 +953,8 @@ class EYE extends HTMLElement {
     this.color2 = this.getAttribute('color-2') || 'orange';
     this.color3 = this.getAttribute('color-3') || 'blue';
     this.color4 = this.getAttribute('color-4') || 'pink';
+    this.color5 = this.getAttribute('color-5') || 'red';
+    this.dither_method = this.getAttribute('dither-method') || 'floyd-steinberg';
     
     this.render();
   }
@@ -711,7 +975,7 @@ class EYE extends HTMLElement {
     }
   
       static get observedAttributes() {
-    return ['contrast', 'saturation', 'brightness', 'hue', 'color-1', 'color-2', 'color-3', 'color-4'];
+    return ['contrast', 'saturation', 'brightness', 'hue', 'color-1', 'color-2', 'color-3', 'color-4', 'color-5', 'dither-method'];
   }
 
   attributeChangedCallback(name, old_value, new_value){
@@ -743,6 +1007,13 @@ class EYE extends HTMLElement {
         break;
       case 'color-4':
         this.color4 = new_value || 'pink';
+        break;
+      case 'color-5':
+        this.color5 = new_value || 'red';
+        break;
+      case 'dither-method':
+        this.dither_method = new_value || 'floyd-steinberg';
+        if (this.dither_select) this.dither_select.value = this.dither_method;
         break;
       default:
     }
