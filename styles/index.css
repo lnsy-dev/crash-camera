@@ -1,0 +1,90 @@
+@import 'variables.css';
+@import 'media-queries.css';
+
+/* Base styles */
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: var(--font-family);
+  margin: 0;
+  padding: 0;
+}
+
+/* EYE Component styles */
+e-y-e {
+  display: block;
+  width: var(--eye-size);
+  margin: 0 auto;
+  padding: var(--padding-standard);
+}
+
+/* Canvas styles */
+e-y-e canvas {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-color);
+}
+
+/* Button styles */
+.initialize-button,
+.take-picture-button {
+  background-color: var(--overlay-background);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: var(--padding-standard);
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background-color var(--transition-speed);
+}
+
+.initialize-button:hover,
+.take-picture-button:hover {
+  background-color: var(--text-color);
+  color: var(--background-color);
+}
+
+/* Menu styles */
+.menu {
+  background-color: var(--overlay-background);
+  border: 1px solid var(--border-color);
+  padding: var(--padding-standard);
+  margin-top: var(--margin-standard);
+}
+
+.menu section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-unit);
+}
+
+/* Form controls */
+.menu label {
+  display: block;
+  margin-bottom: var(--spacing-unit);
+}
+
+.menu input[type="range"],
+.menu select {
+  width: 100%;
+  background-color: var(--overlay-background);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: calc(var(--padding-standard) * 0.5);
+  font-family: var(--font-family);
+}
+
+.menu input[type="checkbox"] {
+  margin-right: var(--spacing-unit);
+}
+
+/* Details/summary styles */
+details {
+  margin-bottom: var(--margin-standard);
+}
+
+summary {
+  cursor: pointer;
+  padding: var(--padding-standard);
+  background-color: var(--overlay-background);
+  border: 1px solid var(--border-color);
+} 

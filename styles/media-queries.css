@@ -1,0 +1,28 @@
+/* Mobile devices */
+@media screen and (max-width: 768px) {
+  e-y-e {
+    --eye-size: 100vw;
+  }
+  
+  .menu {
+    width: 100%;
+  }
+  
+  .menu section {
+    padding: var(--padding-standard);
+  }
+}
+
+/* Tablets */
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+  e-y-e {
+    --eye-size: 80vw;
+  }
+}
+
+/* Desktop */
+@media screen and (min-width: 1025px) {
+  e-y-e {
+    --eye-size: 768px;
+  }
+} 
