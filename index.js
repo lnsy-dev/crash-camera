@@ -243,25 +243,7 @@ class EYE extends HTMLElement {
       });
     }
   
-    async createSelectedDeviceDropdown(){
-      const connected_devices = [...await navigator.mediaDevices.enumerateDevices()].filter(d => d.kind === 'videoinput');
-      const selection_label = document.createElement('label');
-      const video_inputs = document.createElement('select');
-      for (let device_index in connected_devices) {
-        const device = connected_devices[device_index];
-        const option = document.createElement('option');
-        option.setAttribute('value', device.deviceId);
-        option.innerText = device.label || `Camera ${parseInt(device_index) + 1}`;
-        video_inputs.appendChild(option);
-      }
-      video_inputs.addEventListener('change', (e) => {
-        this.selected_device = e.target.value;
-        console.log(this.selected_device);
-        this.getUserMedia();
-      });
-      selection_label.appendChild(video_inputs);
-      this.menu.appendChild(selection_label);
-    }
+
   
         createTakePictureButton(){
       const take_picture_label = document.createElement('label');
@@ -277,18 +259,99 @@ class EYE extends HTMLElement {
       this.menu.appendChild(take_picture_label);
     }
 
-    createExportLayersButton(){
-      const export_layers_label = document.createElement('label');
-      const export_layers_button = document.createElement('button');
-      export_layers_button.classList.add('export-layers-button');
-      export_layers_button.innerText = 'Export Risograph Layers';
-      export_layers_button.addEventListener('click', (e)=>{
+    createBottomControls(){
+      const bottom_container = document.createElement('div');
+      bottom_container.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        z-index: 1000;
+      `;
+
+      // Camera select dropdown
+      this.createBottomDeviceDropdown(bottom_container);
+      
+      // Export layers button
+      this.createBottomExportButton(bottom_container);
+
+      this.appendChild(bottom_container);
+    }
+
+    async createBottomDeviceDropdown(container){
+      const connected_devices = [...await navigator.mediaDevices.enumerateDevices()].filter(d => d.kind === 'videoinput');
+      const selection_wrapper = document.createElement('div');
+      selection_wrapper.style.cssText = `
+        background: rgba(0, 0, 0, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        color: white;
+      `;
+      
+      const selection_label = document.createElement('label');
+      selection_label.innerText = 'Camera: ';
+      selection_label.style.cssText = 'margin-right: 10px;';
+      
+      const video_inputs = document.createElement('select');
+      video_inputs.style.cssText = `
+        padding: 5px;
+        border-radius: 3px;
+        border: none;
+      `;
+      
+      for (let device_index in connected_devices) {
+        const device = connected_devices[device_index];
+        const option = document.createElement('option');
+        option.setAttribute('value', device.deviceId);
+        option.innerText = device.label || `Camera ${parseInt(device_index) + 1}`;
+        video_inputs.appendChild(option);
+      }
+      video_inputs.addEventListener('change', (e) => {
+        this.selected_device = e.target.value;
+        console.log(this.selected_device);
+        this.getUserMedia();
+      });
+      
+      selection_wrapper.appendChild(selection_label);
+      selection_wrapper.appendChild(video_inputs);
+      container.appendChild(selection_wrapper);
+    }
+
+    createBottomExportButton(container){
+      const export_button = document.createElement('button');
+      export_button.classList.add('export-layers-button');
+      export_button.innerText = 'Export Risograph Layers';
+      export_button.style.cssText = `
+        background: #ff6b35;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        transition: background 0.2s;
+      `;
+      
+      export_button.addEventListener('mouseenter', () => {
+        export_button.style.background = '#e55529';
+      });
+      
+      export_button.addEventListener('mouseleave', () => {
+        export_button.style.background = '#ff6b35';
+      });
+      
+      export_button.addEventListener('click', (e)=>{
         e.preventDefault();
         this.exportRisographLayers();
       });
 
-      export_layers_label.appendChild(export_layers_button);
-      this.menu.appendChild(export_layers_label);
+      container.appendChild(export_button);
     }
   
   
@@ -327,9 +390,7 @@ class EYE extends HTMLElement {
       this.createBrightnessSlider();
       this.createhueSlider();
       this.createResetButton();
-      this.createSelectedDeviceDropdown();
       this.createTakePictureButton();
-      this.createExportLayersButton();
   
       const details = [...document.querySelectorAll('details')];
       document.addEventListener('click', function(e) {
@@ -339,6 +400,9 @@ class EYE extends HTMLElement {
           details.forEach(f => !f.contains(e.target) ? f.removeAttribute('open') : '');
         }
       });
+
+      // Create bottom controls container
+      this.createBottomControls();
     }
   
     async getJpeg() {
