@@ -1,18 +1,45 @@
 :root {
-  /* Colors */
-  --background-color: #000000;
-  --text-color: #ffffff;
-  --border-color: #ffffff;
-  --overlay-background: rgba(0, 0, 0, 0.8);
-  
-  /* Fonts */
-  --font-family: 'Courier New', monospace;
-  
-  /* Spacing */
-  --spacing-unit: 1rem;
-  --padding-standard: 1rem;
-  --margin-standard: 1rem;
-  
-  /* Transitions */
-  --transition-speed: 0.3s;
-} 
+    /* Colors */
+    --background-color: #000000;
+    --text-color: #ffffff;
+    --border-color: #ffffff;
+    --overlay-background: rgba(0, 0, 0, 0.8);
+    --overlay-dark: rgba(0, 0, 0, 0.9);
+    --export-button-bg: #ff6b35;
+    --export-button-hover: #e55529;
+    --control-border: #333;
+
+    /* Fonts */
+    --font-family: "Courier New", monospace;
+
+    /* Spacing */
+    --spacing-unit: 1rem;
+    --spacing-small: 8px;
+    --spacing-medium: 10px;
+    --spacing-large: 15px;
+    --padding-standard: 1rem;
+    --padding-small: 10px;
+    --padding-medium: 12px;
+    --padding-large: 15px;
+    --margin-standard: 1rem;
+
+    /* Border radius */
+    --border-radius-small: 3px;
+    --border-radius-medium: 5px;
+    --border-radius-large: 8px;
+
+    /* Z-index */
+    --z-index-controls: 1000;
+
+    /* Shadows */
+    --shadow-small: 0 2px 10px rgba(0, 0, 0, 0.3);
+    --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.3);
+
+    /* Transitions */
+    --transition-speed: 0.3s;
+    --transition-fast: 0.2s;
+
+    /* Component sizes */
+    --color-input-size: 40px;
+    --color-input-height: 30px;
+}

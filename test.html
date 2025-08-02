@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>EYE Web Component Test</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 20px;
+                font-family: Arial, sans-serif;
+                background: #f0f0f0;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            h1 {
+                text-align: center;
+                color: #333;
+            }
+
+            .component-container {
+                background: white;
+                border-radius: var(--border-radius-large);
+                padding: var(--padding-large);
+                box-shadow: var(--shadow-medium);
+                margin-bottom: var(--margin-standard);
+            }
+
+            e-y-e {
+                display: block;
+                width: 100%;
+                height: 600px;
+                border: 2px solid #ddd;
+                border-radius: var(--border-radius-large);
+                background: #fafafa;
+            }
+
+            .info {
+                background: #e8f4f8;
+                padding: var(--padding-large);
+                border-radius: var(--border-radius-medium);
+                margin-top: var(--margin-standard);
+                border-left: 4px solid #007acc;
+            }
+
+            .controls {
+                margin-top: var(--margin-standard);
+                display: flex;
+                gap: var(--spacing-small);
+                flex-wrap: wrap;
+            }
+
+            .controls button {
+                padding: var(--spacing-small) var(--margin-standard);
+                border: none;
+                border-radius: var(--border-radius-medium);
+                background: #007acc;
+                color: white;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background var(--transition-fast);
+            }
+
+            .controls button:hover {
+                background: #005a9e;
+            }
+
+            .event-log {
+                background: #f8f8f8;
+                border: 1px solid #ddd;
+                border-radius: var(--border-radius-medium);
+                padding: var(--padding-large);
+                max-height: 200px;
+                overflow-y: auto;
+                font-family: monospace;
+                font-size: 12px;
+                margin-top: var(--margin-standard);
+            }
+
+            .event-log h3 {
+                margin: 0 0 var(--spacing-small) 0;
+                font-family: Arial, sans-serif;
+                font-size: 16px;
+            }
+
+            .event-entry {
+                margin-bottom: 5px;
+                padding: 5px;
+                background: white;
+                border-radius: var(--border-radius-small);
+            }
+
+            .timestamp {
+                color: #666;
+                font-size: 11px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>EYE Web Component - Rearchitected Test</h1>
+
+            <div class="component-container">
+                <h2>Camera Component</h2>
+                <e-y-e
+                    id="eye-component"
+                    contrast="120"
+                    saturation="110"
+                    brightness="100"
+                    hue="0"
+                    color-1="black"
+                    color-2="orange"
+                    color-3="blue"
+                    color-4="pink"
+                    color-5="red"
+                    dither-method="floyd-steinberg"
+                >
+                </e-y-e>
+
+                <div class="info">
+                    <strong>Instructions:</strong>
+                    <ul>
+                        <li>
+                            Click "Connect" to initialize the camera interface
+                        </li>
+                        <li>
+                            Use the collapsible menu controls to adjust image
+                            settings
+                        </li>
+                        <li>
+                            Select different dithering methods from the bottom
+                            controls
+                        </li>
+                        <li>
+                            Use the color picker on the top-right to change ink
+                            colors
+                        </li>
+                        <li>
+                            Click "Export Layers" to download risograph printing
+                            layers
+                        </li>
+                        <li>Click "Take Picture" to capture an image</li>
+                        <li>
+                            <strong>New:</strong> All styles are now properly
+                            organized in CSS files!
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="controls">
+                    <button onclick="changeColors()">Random Colors</button>
+                    <button onclick="changeDithering()">
+                        Change Dithering
+                    </button>
+                    <button onclick="resetComponent()">Reset Settings</button>
+                    <button onclick="testAttributes()">Test Attributes</button>
+                </div>
+            </div>
+
+            <div class="component-container">
+                <div class="event-log">
+                    <h3>Event Log</h3>
+                    <div id="log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Load the modular component -->
+        <script type="module" src="index.js"></script>
+
+        <script>
+            const eyeComponent = document.getElementById("eye-component");
+            const logElement = document.getElementById("log");
+
+            // Event listeners for component events
+            eyeComponent.addEventListener("NEW PICTURE", (event) => {
+                logEvent("NEW PICTURE", "Picture captured", event.detail);
+            });
+
+            eyeComponent.addEventListener("IMAGE DRAWN", (event) => {
+                logEvent(
+                    "IMAGE DRAWN",
+                    "Frame processed",
+                    `${event.detail.width}x${event.detail.height}`,
+                );
+            });
+
+            function logEvent(type, message, detail) {
+                const timestamp = new Date().toLocaleTimeString();
+                const entry = document.createElement("div");
+                entry.className = "event-entry";
+                entry.innerHTML = `
+                <span class="timestamp">[${timestamp}]</span>
+                <strong>${type}:</strong> ${message}
+                ${detail ? `- ${detail}` : ""}
+            `;
+                logElement.insertBefore(entry, logElement.firstChild);
+
+                // Keep only last 20 entries
+                while (logElement.children.length > 20) {
+                    logElement.removeChild(logElement.lastChild);
+                }
+            }
+
+            // Test functions
+            function changeColors() {
+                const colors = [
+                    "red",
+                    "blue",
+                    "green",
+                    "purple",
+                    "orange",
+                    "yellow",
+                    "pink",
+                    "cyan",
+                ];
+                const randomColors = [];
+                for (let i = 0; i < 5; i++) {
+                    randomColors.push(
+                        colors[Math.floor(Math.random() * colors.length)],
+                    );
+                }
+
+                eyeComponent.setAttribute("color-1", randomColors[0]);
+                eyeComponent.setAttribute("color-2", randomColors[1]);
+                eyeComponent.setAttribute("color-3", randomColors[2]);
+                eyeComponent.setAttribute("color-4", randomColors[3]);
+                eyeComponent.setAttribute("color-5", randomColors[4]);
+
+                logEvent("TEST", "Colors changed", randomColors.join(", "));
+            }
+
+            function changeDithering() {
+                const methods = [
+                    "floyd-steinberg",
+                    "atkinson",
+                    "burkes",
+                    "sierra",
+                    "stucki",
+                    "jarvis",
+                    "threshold",
+                ];
+                const currentMethod =
+                    eyeComponent.getAttribute("dither-method");
+                const currentIndex = methods.indexOf(currentMethod);
+                const nextMethod = methods[(currentIndex + 1) % methods.length];
+
+                eyeComponent.setAttribute("dither-method", nextMethod);
+                logEvent("TEST", "Dithering changed", nextMethod);
+            }
+
+            function resetComponent() {
+                eyeComponent.setAttribute("contrast", "100");
+                eyeComponent.setAttribute("saturation", "100");
+                eyeComponent.setAttribute("brightness", "100");
+                eyeComponent.setAttribute("hue", "0");
+                eyeComponent.setAttribute("color-1", "black");
+                eyeComponent.setAttribute("color-2", "orange");
+                eyeComponent.setAttribute("color-3", "blue");
+                eyeComponent.setAttribute("color-4", "pink");
+                eyeComponent.setAttribute("color-5", "red");
+                eyeComponent.setAttribute("dither-method", "floyd-steinberg");
+
+                logEvent(
+                    "TEST",
+                    "Component reset",
+                    "All settings restored to defaults",
+                );
+            }
+
+            function testAttributes() {
+                eyeComponent.setAttribute("contrast", "150");
+                eyeComponent.setAttribute("saturation", "200");
+                eyeComponent.setAttribute("brightness", "80");
+                eyeComponent.setAttribute("hue", "180");
+
+                logEvent(
+                    "TEST",
+                    "Attributes updated",
+                    "Contrast: 150, Saturation: 200, Brightness: 80, Hue: 180",
+                );
+            }
+
+            // Log component initialization
+            document.addEventListener("DOMContentLoaded", () => {
+                logEvent(
+                    "INIT",
+                    "Test page loaded",
+                    "Component ready for testing",
+                );
+            });
+        </script>
+    </body>
+</html>
