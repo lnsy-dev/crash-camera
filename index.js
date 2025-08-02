@@ -121,6 +121,10 @@ class EYE extends HTMLElement {
   // Polling
   video_poll = null;
 
+  // Image upload state
+  uploadedImage = null;
+  isImageUploaded = false;
+
   // =============================================================================
   // LIFECYCLE METHODS
   // =============================================================================
@@ -292,6 +296,14 @@ class EYE extends HTMLElement {
           `Size changed to: ${widthValue}×${heightValue} ${sizeUnit} (${newPixelWidth}×${newPixelHeight}px)`,
         );
       },
+
+      onImageUpload: (file) => {
+        this.handleImageUpload(file);
+      },
+
+      onCloseUpload: () => {
+        this.closeUploadedImage();
+      },
     };
   }
 
@@ -425,6 +437,12 @@ class EYE extends HTMLElement {
    * Process single video frame
    */
   async pollVideo() {
+    // Skip video processing if an image is uploaded
+    if (this.isImageUploaded) {
+      this.processUploadedImage();
+      return;
+    }
+
     const video = this.cameraManager.getVideoElement();
     if (!video || !video.videoWidth || !video.videoHeight) {
       return;
@@ -468,6 +486,9 @@ class EYE extends HTMLElement {
       drawHeight,
     );
 
+    // Reset filter to avoid affecting future operations
+    this.scratch_canvas_context.filter = "none";
+
     // Get image data and apply dithering
     const img_data = this.scratch_canvas_context.getImageData(
       0,
@@ -486,6 +507,128 @@ class EYE extends HTMLElement {
         detail: dithered_data,
       }),
     );
+  }
+
+  /**
+   * Handle uploaded image file
+   * @param {File} file - The uploaded image file
+   */
+  async handleImageUpload(file) {
+    const img = new Image();
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    return new Promise((resolve, reject) => {
+      img.onload = () => {
+        // Set canvas size to match our eye dimensions
+        canvas.width = this.eye_width;
+        canvas.height = this.eye_height;
+
+        // Calculate scaling to maintain aspect ratio
+        const imgAspect = img.width / img.height;
+        const canvasAspect = this.eye_width / this.eye_height;
+
+        let drawWidth, drawHeight, drawX, drawY;
+
+        if (imgAspect > canvasAspect) {
+          // Image is wider than canvas - fit by height
+          drawHeight = this.eye_height;
+          drawWidth = drawHeight * imgAspect;
+          drawX = (this.eye_width - drawWidth) / 2;
+          drawY = 0;
+        } else {
+          // Image is taller than canvas - fit by width
+          drawWidth = this.eye_width;
+          drawHeight = drawWidth / imgAspect;
+          drawX = 0;
+          drawY = (this.eye_height - drawHeight) / 2;
+        }
+
+        // Clear canvas and draw the uploaded image
+        ctx.clearRect(0, 0, this.eye_width, this.eye_height);
+        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+
+        // Store the uploaded image canvas
+        this.uploadedImage = canvas;
+        this.isImageUploaded = true;
+
+        // Pause video polling and update UI
+        this.pauseVideoPoll();
+        this.uiManager.toggleUploadButtons(true);
+
+        // Process the uploaded image immediately
+        this.processUploadedImage();
+
+        console.log("Image uploaded and processed");
+        resolve();
+      };
+
+      img.onerror = () => {
+        console.error("Failed to load uploaded image");
+        reject(new Error("Failed to load image"));
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  /**
+   * Process the uploaded image with current settings
+   */
+  processUploadedImage() {
+    if (!this.uploadedImage || !this.isImageUploaded) {
+      return;
+    }
+
+    // Copy to scratch canvas with filters applied
+    this.scratch_canvas_context.clearRect(
+      0,
+      0,
+      this.eye_width,
+      this.eye_height,
+    );
+
+    // Apply CSS filters during the copy operation
+    this.scratch_canvas_context.filter = `saturate(${this.saturation}%) brightness(${this.brightness}%) contrast(${this.contrast}%) hue-rotate(${this.hue}deg)`;
+    this.scratch_canvas_context.drawImage(this.uploadedImage, 0, 0);
+
+    // Reset filter to avoid affecting future operations
+    this.scratch_canvas_context.filter = "none";
+
+    // Get image data and apply dithering
+    const img_data = this.scratch_canvas_context.getImageData(
+      0,
+      0,
+      this.eye_width,
+      this.eye_height,
+    );
+    const dithered_data = this.imageProcessor.applyDithering(img_data);
+
+    // Display processed result
+    this.final_canvas_context.putImageData(dithered_data, 0, 0);
+
+    // Dispatch event with processed data
+    this.dispatchEvent(
+      new CustomEvent(EVENTS.IMAGE_DRAWN, {
+        detail: dithered_data,
+      }),
+    );
+  }
+
+  /**
+   * Close uploaded image and return to camera mode
+   */
+  closeUploadedImage() {
+    this.uploadedImage = null;
+    this.isImageUploaded = false;
+
+    // Update UI buttons
+    this.uiManager.toggleUploadButtons(false);
+
+    // Resume video polling
+    this.beginVideoPoll();
+
+    console.log("Uploaded image closed, returning to camera mode");
   }
 
   /**
@@ -587,18 +730,34 @@ class EYE extends HTMLElement {
       case "contrast":
         this.contrast = parseInt(new_value) || DEFAULT_VALUES.CONTRAST;
         this.uiManager.updateSlider("contrast", this.contrast);
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
+        }
         break;
       case "saturation":
         this.saturation = parseInt(new_value) || DEFAULT_VALUES.SATURATION;
         this.uiManager.updateSlider("saturation", this.saturation);
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
+        }
         break;
       case "brightness":
         this.brightness = parseInt(new_value) || DEFAULT_VALUES.BRIGHTNESS;
         this.uiManager.updateSlider("brightness", this.brightness);
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
+        }
         break;
       case "hue":
         this.hue = parseInt(new_value) || DEFAULT_VALUES.HUE;
         this.uiManager.updateSlider("hue", this.hue);
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
+        }
         break;
       case "color-1":
         this.color1 = new_value || DEFAULT_VALUES.COLOR_1;
@@ -610,6 +769,10 @@ class EYE extends HTMLElement {
             this.color4,
             this.color5,
           );
+        }
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
         }
         break;
       case "color-2":
@@ -623,6 +786,10 @@ class EYE extends HTMLElement {
             this.color5,
           );
         }
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
+        }
         break;
       case "color-3":
         this.color3 = new_value || DEFAULT_VALUES.COLOR_3;
@@ -634,6 +801,10 @@ class EYE extends HTMLElement {
             this.color4,
             this.color5,
           );
+        }
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
         }
         break;
       case "color-4":
@@ -647,6 +818,10 @@ class EYE extends HTMLElement {
             this.color5,
           );
         }
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
+        }
         break;
       case "color-5":
         this.color5 = new_value || DEFAULT_VALUES.COLOR_5;
@@ -659,6 +834,10 @@ class EYE extends HTMLElement {
             this.color5,
           );
         }
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
+        }
         break;
       case "dither-method":
         this.dither_method = new_value || DEFAULT_VALUES.DITHER_METHOD;
@@ -666,6 +845,10 @@ class EYE extends HTMLElement {
           this.imageProcessor.setDitherMethod(this.dither_method);
         }
         this.uiManager.updateDitherMethod(this.dither_method);
+        // Reprocess uploaded image if one is loaded
+        if (this.isImageUploaded) {
+          this.processUploadedImage();
+        }
         break;
       case "width-value":
         this.width_value = parseFloat(new_value) || DEFAULT_VALUES.WIDTH_VALUE;

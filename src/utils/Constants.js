@@ -81,6 +81,8 @@ export const CSS_CLASSES = {
   bottomContainer: "bottom-controls",
   controlWrapper: "control-wrapper",
   exportButton: "export-layers-button",
+  uploadButton: "upload-image-button",
+  closeUploadButton: "close-upload-button",
   colorPickerContainer: "color-picker-container",
   colorRow: "color-row",
   colorInput: "color-input",

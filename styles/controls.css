@@ -58,6 +58,41 @@
     background: var(--export-button-hover);
 }
 
+/* Upload image button */
+.upload-image-button {
+    background: var(--overlay-background);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: var(--padding-medium) 20px;
+    border-radius: var(--border-radius-medium);
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.upload-image-button:hover {
+    background: var(--text-color);
+    color: var(--background-color);
+}
+
+/* Close upload button */
+.close-upload-button {
+    background: #ff4444;
+    color: white;
+    border: none;
+    padding: var(--padding-medium) 20px;
+    border-radius: var(--border-radius-medium);
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.close-upload-button:hover {
+    background: #cc3333;
+}
+
 /* Color picker container */
 .color-picker-container {
     position: fixed;
@@ -144,7 +179,9 @@
         width: auto;
     }
 
-    .export-layers-button {
+    .export-layers-button,
+    .upload-image-button,
+    .close-upload-button {
         width: 100%;
         padding: var(--padding-large);
     }

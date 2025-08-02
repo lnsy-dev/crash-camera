@@ -321,6 +321,12 @@ export class UIManager {
     // Dithering method selector
     this.createDitherSelector(bottomContainer);
 
+    // Image upload button
+    this.createUploadImageButton(bottomContainer);
+
+    // Close upload button (initially hidden)
+    this.createCloseUploadButton(bottomContainer);
+
     // Export layers button
     this.createExportButton(bottomContainer);
 
@@ -430,6 +436,79 @@ export class UIManager {
 
     container.appendChild(exportButton);
     this.elements.exportButton = exportButton;
+  }
+
+  /**
+   * Create upload image button
+   * @param {HTMLElement} container - Parent container element
+   */
+  createUploadImageButton(container) {
+    const uploadButton = document.createElement("button");
+    uploadButton.className = CSS_CLASSES.uploadButton;
+    uploadButton.innerText = "Upload Image";
+
+    // Create hidden file input
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.style.display = "none";
+
+    uploadButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file && this.callbacks.onImageUpload) {
+        this.callbacks.onImageUpload(file);
+        // Clear the input so the same file can be uploaded again
+        fileInput.value = "";
+      }
+    });
+
+    container.appendChild(uploadButton);
+    container.appendChild(fileInput);
+    this.elements.uploadButton = uploadButton;
+    this.elements.fileInput = fileInput;
+  }
+
+  /**
+   * Create close upload button
+   * @param {HTMLElement} container - Parent container element
+   */
+  createCloseUploadButton(container) {
+    const closeButton = document.createElement("button");
+    closeButton.className = CSS_CLASSES.closeUploadButton;
+    closeButton.innerText = "Close Uploaded Image";
+    closeButton.style.display = "none"; // Initially hidden
+
+    closeButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (this.callbacks.onCloseUpload) {
+        this.callbacks.onCloseUpload();
+      }
+    });
+
+    container.appendChild(closeButton);
+    this.elements.closeUploadButton = closeButton;
+  }
+
+  /**
+   * Show or hide upload-related buttons based on upload state
+   * @param {boolean} isUploaded - Whether an image is currently uploaded
+   */
+  toggleUploadButtons(isUploaded) {
+    if (this.elements.uploadButton) {
+      this.elements.uploadButton.style.display = isUploaded
+        ? "none"
+        : "inline-block";
+    }
+    if (this.elements.closeUploadButton) {
+      this.elements.closeUploadButton.style.display = isUploaded
+        ? "inline-block"
+        : "none";
+    }
   }
 
   /**
