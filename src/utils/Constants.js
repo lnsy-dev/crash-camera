@@ -5,6 +5,10 @@
 export const DEFAULT_VALUES = {
   // Canvas and display settings
   EYE_SIZE: 900,
+  WIDTH_VALUE: 7.5,
+  HEIGHT_VALUE: 7.5,
+  SIZE_UNIT: "cm",
+  DPI: 300,
   VIDEO_POLLING_INTERVAL: 250,
 
   // Image adjustment defaults
@@ -39,6 +43,12 @@ export const DITHER_METHODS = [
   { value: "threshold", label: "Simple Threshold" },
 ];
 
+export const SIZE_UNITS = [
+  { value: "px", label: "Pixels", min: 100, max: 3000, step: 10 },
+  { value: "cm", label: "Centimeters", min: 2, max: 50, step: 0.1 },
+  { value: "in", label: "Inches", min: 1, max: 20, step: 0.1 },
+];
+
 export const SLIDER_CONFIGS = {
   contrast: { min: 0, max: 300, default: 100 },
   saturation: { min: 0, max: 300, default: 100 },
@@ -57,6 +67,9 @@ export const OBSERVED_ATTRIBUTES = [
   "color-4",
   "color-5",
   "dither-method",
+  "width-value",
+  "height-value",
+  "size-unit",
 ];
 
 export const EVENTS = {

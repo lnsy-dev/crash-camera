@@ -7,8 +7,15 @@ import {
   DITHER_METHODS,
   SLIDER_CONFIGS,
   CSS_CLASSES,
+  SIZE_UNITS,
 } from "../utils/Constants.js";
 import { colorNameToHex } from "../utils/ColorUtils.js";
+import {
+  convertToPixels,
+  getSizeUnitConfig,
+  clampSizeValue,
+  formatSizeDisplay,
+} from "../utils/SizeUtils.js";
 
 export class UIManager {
   constructor() {
@@ -51,6 +58,150 @@ export class UIManager {
         );
       }
     });
+  }
+
+  /**
+   * Create size selector with unit dropdown and separate width/height inputs
+   * @param {number} widthValue - Current width value
+   * @param {number} heightValue - Current height value
+   * @param {string} sizeUnit - Current size unit
+   * @param {number} dpi - DPI for pixel conversion
+   */
+  createSizeSelector(widthValue, heightValue, sizeUnit, dpi) {
+    const sizeContainer = document.createElement("div");
+    sizeContainer.style.display = "flex";
+    sizeContainer.style.flexDirection = "column";
+    sizeContainer.style.gap = "5px";
+    sizeContainer.style.marginBottom = "10px";
+
+    // Size label
+    const sizeLabel = document.createElement("label");
+    sizeLabel.innerText = "Image Size";
+    sizeLabel.style.fontWeight = "bold";
+    sizeContainer.appendChild(sizeLabel);
+
+    // Unit dropdown container
+    const unitContainer = document.createElement("div");
+    unitContainer.style.display = "flex";
+    unitContainer.style.gap = "5px";
+    unitContainer.style.alignItems = "center";
+    unitContainer.style.marginBottom = "5px";
+
+    const unitLabel = document.createElement("span");
+    unitLabel.innerText = "Unit:";
+    unitLabel.style.fontSize = "0.9em";
+
+    // Unit dropdown
+    const unitSelect = document.createElement("select");
+    SIZE_UNITS.forEach((unit) => {
+      const option = document.createElement("option");
+      option.value = unit.value;
+      option.innerText = unit.label;
+      unitSelect.appendChild(option);
+    });
+    unitSelect.value = sizeUnit;
+
+    unitContainer.appendChild(unitLabel);
+    unitContainer.appendChild(unitSelect);
+    sizeContainer.appendChild(unitContainer);
+
+    // Width controls
+    const widthContainer = document.createElement("div");
+    widthContainer.style.display = "flex";
+    widthContainer.style.gap = "5px";
+    widthContainer.style.alignItems = "center";
+
+    const widthLabel = document.createElement("span");
+    widthLabel.innerText = "W:";
+    widthLabel.style.fontSize = "0.9em";
+    widthLabel.style.minWidth = "20px";
+
+    const widthInput = document.createElement("input");
+    widthInput.type = "number";
+    widthInput.value = widthValue;
+    widthInput.style.width = "70px";
+
+    widthContainer.appendChild(widthLabel);
+    widthContainer.appendChild(widthInput);
+    sizeContainer.appendChild(widthContainer);
+
+    // Height controls
+    const heightContainer = document.createElement("div");
+    heightContainer.style.display = "flex";
+    heightContainer.style.gap = "5px";
+    heightContainer.style.alignItems = "center";
+
+    const heightLabel = document.createElement("span");
+    heightLabel.innerText = "H:";
+    heightLabel.style.fontSize = "0.9em";
+    heightLabel.style.minWidth = "20px";
+
+    const heightInput = document.createElement("input");
+    heightInput.type = "number";
+    heightInput.value = heightValue;
+    heightInput.style.width = "70px";
+
+    heightContainer.appendChild(heightLabel);
+    heightContainer.appendChild(heightInput);
+    sizeContainer.appendChild(heightContainer);
+
+    // Submit button
+    const submitButton = document.createElement("button");
+    submitButton.innerText = "Apply Size";
+    submitButton.style.marginTop = "5px";
+    submitButton.style.padding = "4px 8px";
+    submitButton.style.fontSize = "0.9em";
+    sizeContainer.appendChild(submitButton);
+
+    // Update input constraints based on unit
+    const updateInputConstraints = () => {
+      const unitConfig = getSizeUnitConfig(unitSelect.value, SIZE_UNITS);
+      if (unitConfig) {
+        widthInput.min = unitConfig.min;
+        widthInput.max = unitConfig.max;
+        widthInput.step = unitConfig.step;
+        heightInput.min = unitConfig.min;
+        heightInput.max = unitConfig.max;
+        heightInput.step = unitConfig.step;
+      }
+    };
+
+    updateInputConstraints();
+
+    // Event listeners
+    const handleSizeChange = () => {
+      const width = parseFloat(widthInput.value);
+      const height = parseFloat(heightInput.value);
+      const unit = unitSelect.value;
+
+      if (!isNaN(width) && !isNaN(height)) {
+        const clampedWidth = clampSizeValue(width, unit, SIZE_UNITS);
+        const clampedHeight = clampSizeValue(height, unit, SIZE_UNITS);
+
+        if (clampedWidth !== width) {
+          widthInput.value = clampedWidth;
+        }
+        if (clampedHeight !== height) {
+          heightInput.value = clampedHeight;
+        }
+
+        if (this.callbacks.onSizeChange) {
+          this.callbacks.onSizeChange(clampedWidth, clampedHeight, unit, dpi);
+        }
+      }
+    };
+
+    unitSelect.addEventListener("change", () => {
+      updateInputConstraints();
+    });
+
+    submitButton.addEventListener("click", handleSizeChange);
+
+    this.elements.menu.appendChild(sizeContainer);
+    this.elements.widthInput = widthInput;
+    this.elements.heightInput = heightInput;
+    this.elements.unitSelect = unitSelect;
+    this.elements.submitButton = submitButton;
   }
 
   /**
@@ -394,6 +545,38 @@ export class UIManager {
   updateDitherMethod(method) {
     if (this.elements.ditherSelect) {
       this.elements.ditherSelect.value = method;
+    }
+  }
+
+  /**
+   * Update size selector values
+   * @param {number} widthValue - New width value
+   * @param {number} heightValue - New height value
+   * @param {string} sizeUnit - New size unit
+   */
+  updateSizeSelector(widthValue, heightValue, sizeUnit) {
+    if (this.elements.widthInput) {
+      this.elements.widthInput.value = widthValue;
+    }
+    if (this.elements.heightInput) {
+      this.elements.heightInput.value = heightValue;
+    }
+    if (this.elements.unitSelect) {
+      this.elements.unitSelect.value = sizeUnit;
+      // Update input constraints
+      const unitConfig = getSizeUnitConfig(sizeUnit, SIZE_UNITS);
+      if (unitConfig) {
+        if (this.elements.widthInput) {
+          this.elements.widthInput.min = unitConfig.min;
+          this.elements.widthInput.max = unitConfig.max;
+          this.elements.widthInput.step = unitConfig.step;
+        }
+        if (this.elements.heightInput) {
+          this.elements.heightInput.min = unitConfig.min;
+          this.elements.heightInput.max = unitConfig.max;
+          this.elements.heightInput.step = unitConfig.step;
+        }
+      }
     }
   }
 

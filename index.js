@@ -36,18 +36,18 @@
  * @version 2.0.0
  */
 
-import { CameraManager } from './src/camera/CameraManager.js';
-import { ImageProcessor } from './src/image/ImageProcessor.js';
-import { UIManager } from './src/ui/UIManager.js';
-import { ExportManager } from './src/export/ExportManager.js';
+import { CameraManager } from "./src/camera/CameraManager.js";
+import { ImageProcessor } from "./src/image/ImageProcessor.js";
+import { UIManager } from "./src/ui/UIManager.js";
+import { ExportManager } from "./src/export/ExportManager.js";
 import {
   DEFAULT_VALUES,
   OBSERVED_ATTRIBUTES,
-  EVENTS
-} from './src/utils/Constants.js';
+  EVENTS,
+} from "./src/utils/Constants.js";
+import { convertToPixels } from "./src/utils/SizeUtils.js";
 
 class EYE extends HTMLElement {
-
   // =============================================================================
   // CLASS PROPERTIES
   // =============================================================================
@@ -58,8 +58,23 @@ class EYE extends HTMLElement {
   /** @type {boolean} Whether the image should be horizontally flipped */
   flipped = false;
 
-  /** @type {number} Canvas size in pixels (square format for risograph) */
-  eye_size = DEFAULT_VALUES.EYE_SIZE;
+  /** @type {number} Canvas width in pixels */
+  eye_width = DEFAULT_VALUES.EYE_SIZE;
+
+  /** @type {number} Canvas height in pixels */
+  eye_height = DEFAULT_VALUES.EYE_SIZE;
+
+  /** @type {number} Width value in the selected unit */
+  width_value = DEFAULT_VALUES.WIDTH_VALUE;
+
+  /** @type {number} Height value in the selected unit */
+  height_value = DEFAULT_VALUES.HEIGHT_VALUE;
+
+  /** @type {string} Size unit (px, cm, in) */
+  size_unit = DEFAULT_VALUES.SIZE_UNIT;
+
+  /** @type {number} DPI for unit conversion */
+  dpi = DEFAULT_VALUES.DPI;
 
   /** @type {number} Image contrast level (0-300, default 100) */
   contrast = DEFAULT_VALUES.CONTRAST;
@@ -115,10 +130,10 @@ class EYE extends HTMLElement {
    * Creates a "Connect" button that initializes the camera interface when clicked
    */
   render() {
-    const initialize_button = document.createElement('button');
-    initialize_button.classList.add('initialize-button');
-    initialize_button.innerText = 'Connect';
-    initialize_button.addEventListener('click', () => {
+    const initialize_button = document.createElement("button");
+    initialize_button.classList.add("initialize-button");
+    initialize_button.innerText = "Connect";
+    initialize_button.addEventListener("click", () => {
       this.openEYE();
     });
     this.appendChild(initialize_button);
@@ -128,7 +143,7 @@ class EYE extends HTMLElement {
    * Initialize the full camera interface
    */
   openEYE() {
-    this.innerHTML = '';
+    this.innerHTML = "";
     this.setupCanvases();
     this.setupManagers();
     this.createUI();
@@ -140,20 +155,24 @@ class EYE extends HTMLElement {
    */
   setupCanvases() {
     // Scratch canvas for video capture
-    this.scratch_canvas = document.createElement('canvas');
-    this.scratch_canvas.width = this.eye_size;
-    this.scratch_canvas.height = this.eye_size;
-    this.scratch_canvas_context = this.scratch_canvas.getContext('2d', { preserveDrawingBuffer: true });
+    this.scratch_canvas = document.createElement("canvas");
+    this.scratch_canvas.width = this.eye_width;
+    this.scratch_canvas.height = this.eye_height;
+    this.scratch_canvas_context = this.scratch_canvas.getContext("2d", {
+      preserveDrawingBuffer: true,
+    });
 
     // Final canvas for processed output
-    this.final_canvas = document.createElement('canvas');
-    this.final_canvas.width = this.eye_size;
-    this.final_canvas.height = this.eye_size;
-    this.final_canvas_context = this.final_canvas.getContext('2d', { preserveDrawingBuffer: true });
+    this.final_canvas = document.createElement("canvas");
+    this.final_canvas.width = this.eye_width;
+    this.final_canvas.height = this.eye_height;
+    this.final_canvas_context = this.final_canvas.getContext("2d", {
+      preserveDrawingBuffer: true,
+    });
     this.appendChild(this.final_canvas);
 
     // Click to toggle video polling
-    this.scratch_canvas.addEventListener('click', () => {
+    this.scratch_canvas.addEventListener("click", () => {
       if (this.video_polling) {
         this.pauseVideoPoll();
       } else {
@@ -173,7 +192,13 @@ class EYE extends HTMLElement {
 
     // Initialize image processor with current palette
     this.imageProcessor.setDitherMethod(this.dither_method);
-    this.imageProcessor.setPalette(this.color1, this.color2, this.color3, this.color4, this.color5);
+    this.imageProcessor.setPalette(
+      this.color1,
+      this.color2,
+      this.color3,
+      this.color4,
+      this.color5,
+    );
 
     // Initialize export manager
     this.exportManager.initialize(this.scratch_canvas, this.final_canvas, this);
@@ -189,7 +214,7 @@ class EYE extends HTMLElement {
   getUICallbacks() {
     return {
       onFlip: () => {
-        this.scratch_canvas_context.translate(this.eye_size, 0);
+        this.scratch_canvas_context.translate(this.eye_width, 0);
         this.scratch_canvas_context.scale(-1, 1);
       },
 
@@ -214,22 +239,59 @@ class EYE extends HTMLElement {
       onDitherMethodChange: (method) => {
         this.dither_method = method;
         this.imageProcessor.setDitherMethod(method);
-        console.log('Dither method changed to:', method);
+        console.log("Dither method changed to:", method);
       },
 
       onExportLayers: () => {
         this.exportManager.exportRisographLayers(
-          this.color1, this.color2, this.color3, this.color4, this.color5, this.eye_size
+          this.color1,
+          this.color2,
+          this.color3,
+          this.color4,
+          this.color5,
+          this.eye_width,
+          this.eye_height,
         );
       },
 
       onColorChange: (propertyName, newColor) => {
         this[propertyName] = newColor;
-        this.imageProcessor.setPalette(this.color1, this.color2, this.color3, this.color4, this.color5);
+        this.imageProcessor.setPalette(
+          this.color1,
+          this.color2,
+          this.color3,
+          this.color4,
+          this.color5,
+        );
         // Update the corresponding attribute
-        const attrName = propertyName.replace(/(\d)/, '-$1');
+        const attrName = propertyName.replace(/(\d)/, "-$1");
         this.setAttribute(attrName, newColor);
-      }
+      },
+
+      onSizeChange: (widthValue, heightValue, sizeUnit, dpi) => {
+        this.width_value = widthValue;
+        this.height_value = heightValue;
+        this.size_unit = sizeUnit;
+        this.dpi = dpi;
+
+        // Calculate new pixel sizes
+        const newPixelWidth = convertToPixels(widthValue, sizeUnit, dpi);
+        const newPixelHeight = convertToPixels(heightValue, sizeUnit, dpi);
+        this.eye_width = newPixelWidth;
+        this.eye_height = newPixelHeight;
+
+        // Update canvas sizes
+        this.resizeCanvases();
+
+        // Update attributes
+        this.setAttribute("width-value", widthValue);
+        this.setAttribute("height-value", heightValue);
+        this.setAttribute("size-unit", sizeUnit);
+
+        console.log(
+          `Size changed to: ${widthValue}×${heightValue} ${sizeUnit} (${newPixelWidth}×${newPixelHeight}px)`,
+        );
+      },
     };
   }
 
@@ -238,12 +300,18 @@ class EYE extends HTMLElement {
    */
   createUI() {
     this.uiManager.createMenu();
+    this.uiManager.createSizeSelector(
+      this.width_value,
+      this.height_value,
+      this.size_unit,
+      this.dpi,
+    );
     this.uiManager.createFlipButton();
     this.uiManager.createImageSliders({
       contrast: this.contrast,
       saturation: this.saturation,
       brightness: this.brightness,
-      hue: this.hue
+      hue: this.hue,
     });
     this.uiManager.createResetButton();
     this.uiManager.createTakePictureButton();
@@ -253,11 +321,30 @@ class EYE extends HTMLElement {
       color2: this.color2,
       color3: this.color3,
       color4: this.color4,
-      color5: this.color5
+      color5: this.color5,
     });
 
     // Populate camera list
     this.updateCameraList();
+  }
+
+  /**
+   * Resize canvases when size changes
+   */
+  resizeCanvases() {
+    if (this.scratch_canvas && this.final_canvas) {
+      // Update scratch canvas
+      this.scratch_canvas.width = this.eye_width;
+      this.scratch_canvas.height = this.eye_height;
+
+      // Update final canvas
+      this.final_canvas.width = this.eye_width;
+      this.final_canvas.height = this.eye_height;
+
+      console.log(
+        `Canvases resized to: ${this.eye_width}×${this.eye_height}px`,
+      );
+    }
   }
 
   /**
@@ -267,7 +354,7 @@ class EYE extends HTMLElement {
     try {
       await this.cameraManager.startStream();
     } catch (error) {
-      console.error('Failed to start camera:', error);
+      console.error("Failed to start camera:", error);
     }
   }
 
@@ -281,17 +368,20 @@ class EYE extends HTMLElement {
       // Enhance device names
       const enhancedDevices = devices.map((device, index) => ({
         deviceId: device.deviceId,
-        label: CameraManager.createDeviceName(device, index)
+        label: CameraManager.createDeviceName(device, index),
       }));
 
-      this.uiManager.updateCameraList(enhancedDevices, this.cameraManager.selectedDevice);
+      this.uiManager.updateCameraList(
+        enhancedDevices,
+        this.cameraManager.selectedDevice,
+      );
 
       // Set first device as default if none selected
       if (!this.cameraManager.selectedDevice && enhancedDevices.length > 0) {
         this.cameraManager.setSelectedDevice(enhancedDevices[0].deviceId);
       }
     } catch (error) {
-      console.error('Error updating camera list:', error);
+      console.error("Error updating camera list:", error);
     }
   }
 
@@ -308,7 +398,7 @@ class EYE extends HTMLElement {
       contrast: this.contrast,
       saturation: this.saturation,
       brightness: this.brightness,
-      hue: this.hue
+      hue: this.hue,
     });
   }
 
@@ -317,7 +407,10 @@ class EYE extends HTMLElement {
    */
   async beginVideoPoll() {
     this.video_polling = true;
-    this.video_poll = setInterval(() => this.pollVideo(), DEFAULT_VALUES.VIDEO_POLLING_INTERVAL);
+    this.video_poll = setInterval(
+      () => this.pollVideo(),
+      DEFAULT_VALUES.VIDEO_POLLING_INTERVAL,
+    );
   }
 
   /**
@@ -338,43 +431,61 @@ class EYE extends HTMLElement {
     }
 
     // Clear the canvas first
-    this.scratch_canvas_context.clearRect(0, 0, this.eye_size, this.eye_size);
+    this.scratch_canvas_context.clearRect(
+      0,
+      0,
+      this.eye_width,
+      this.eye_height,
+    );
 
     // Calculate scaling to maintain aspect ratio
     const videoAspect = video.videoWidth / video.videoHeight;
-    const canvasAspect = 1; // Square canvas
+    const canvasAspect = this.eye_width / this.eye_height;
 
     let drawWidth, drawHeight, drawX, drawY;
 
     if (videoAspect > canvasAspect) {
       // Video is wider than canvas - fit by height
-      drawHeight = this.eye_size;
+      drawHeight = this.eye_height;
       drawWidth = drawHeight * videoAspect;
-      drawX = (this.eye_size - drawWidth) / 2;
+      drawX = (this.eye_width - drawWidth) / 2;
       drawY = 0;
     } else {
       // Video is taller than canvas - fit by width
-      drawWidth = this.eye_size;
+      drawWidth = this.eye_width;
       drawHeight = drawWidth / videoAspect;
       drawX = 0;
-      drawY = (this.eye_size - drawHeight) / 2;
+      drawY = (this.eye_height - drawHeight) / 2;
     }
 
     // Apply CSS filters and draw video frame
     this.scratch_canvas_context.filter = `saturate(${this.saturation}%) brightness(${this.brightness}%) contrast(${this.contrast}%) hue-rotate(${this.hue}deg)`;
-    await this.scratch_canvas_context.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+    await this.scratch_canvas_context.drawImage(
+      video,
+      drawX,
+      drawY,
+      drawWidth,
+      drawHeight,
+    );
 
     // Get image data and apply dithering
-    const img_data = this.scratch_canvas_context.getImageData(0, 0, this.eye_size, this.eye_size);
+    const img_data = this.scratch_canvas_context.getImageData(
+      0,
+      0,
+      this.eye_width,
+      this.eye_height,
+    );
     const dithered_data = this.imageProcessor.applyDithering(img_data);
 
     // Display processed result
     this.final_canvas_context.putImageData(dithered_data, 0, 0);
 
     // Dispatch event with processed data
-    this.dispatchEvent(new CustomEvent(EVENTS.IMAGE_DRAWN, {
-      detail: dithered_data
-    }));
+    this.dispatchEvent(
+      new CustomEvent(EVENTS.IMAGE_DRAWN, {
+        detail: dithered_data,
+      }),
+    );
   }
 
   /**
@@ -386,8 +497,15 @@ class EYE extends HTMLElement {
    * @param {number} lineWidth - Width of the line in pixels
    * @param {string} strokeStyle - Color of the line
    */
-  drawLine(startX, startY, endX, endY, lineWidth = 1, strokeStyle = 'red') {
-    this.exportManager.drawLine(startX, startY, endX, endY, lineWidth, strokeStyle);
+  drawLine(startX, startY, endX, endY, lineWidth = 1, strokeStyle = "red") {
+    this.exportManager.drawLine(
+      startX,
+      startY,
+      endX,
+      endY,
+      lineWidth,
+      strokeStyle,
+    );
   }
 
   // =============================================================================
@@ -399,16 +517,39 @@ class EYE extends HTMLElement {
    */
   connectedCallback() {
     // Set initial values from HTML attributes with sensible defaults
-    this.contrast = parseInt(this.getAttribute('contrast')) || DEFAULT_VALUES.CONTRAST;
-    this.saturation = parseInt(this.getAttribute('saturation')) || DEFAULT_VALUES.SATURATION;
-    this.brightness = parseInt(this.getAttribute('brightness')) || DEFAULT_VALUES.BRIGHTNESS;
-    this.hue = parseInt(this.getAttribute('hue')) || DEFAULT_VALUES.HUE;
-    this.color1 = this.getAttribute('color-1') || DEFAULT_VALUES.COLOR_1;
-    this.color2 = this.getAttribute('color-2') || DEFAULT_VALUES.COLOR_2;
-    this.color3 = this.getAttribute('color-3') || DEFAULT_VALUES.COLOR_3;
-    this.color4 = this.getAttribute('color-4') || DEFAULT_VALUES.COLOR_4;
-    this.color5 = this.getAttribute('color-5') || DEFAULT_VALUES.COLOR_5;
-    this.dither_method = this.getAttribute('dither-method') || DEFAULT_VALUES.DITHER_METHOD;
+    this.contrast =
+      parseInt(this.getAttribute("contrast")) || DEFAULT_VALUES.CONTRAST;
+    this.saturation =
+      parseInt(this.getAttribute("saturation")) || DEFAULT_VALUES.SATURATION;
+    this.brightness =
+      parseInt(this.getAttribute("brightness")) || DEFAULT_VALUES.BRIGHTNESS;
+    this.hue = parseInt(this.getAttribute("hue")) || DEFAULT_VALUES.HUE;
+    this.color1 = this.getAttribute("color-1") || DEFAULT_VALUES.COLOR_1;
+    this.color2 = this.getAttribute("color-2") || DEFAULT_VALUES.COLOR_2;
+    this.color3 = this.getAttribute("color-3") || DEFAULT_VALUES.COLOR_3;
+    this.color4 = this.getAttribute("color-4") || DEFAULT_VALUES.COLOR_4;
+    this.color5 = this.getAttribute("color-5") || DEFAULT_VALUES.COLOR_5;
+    this.dither_method =
+      this.getAttribute("dither-method") || DEFAULT_VALUES.DITHER_METHOD;
+    this.width_value =
+      parseFloat(this.getAttribute("width-value")) ||
+      DEFAULT_VALUES.WIDTH_VALUE;
+    this.height_value =
+      parseFloat(this.getAttribute("height-value")) ||
+      DEFAULT_VALUES.HEIGHT_VALUE;
+    this.size_unit = this.getAttribute("size-unit") || DEFAULT_VALUES.SIZE_UNIT;
+
+    // Calculate initial eye dimensions from width/height values and unit
+    this.eye_width = convertToPixels(
+      this.width_value,
+      this.size_unit,
+      this.dpi,
+    );
+    this.eye_height = convertToPixels(
+      this.height_value,
+      this.size_unit,
+      this.dpi,
+    );
 
     this.render();
   }
@@ -442,59 +583,146 @@ class EYE extends HTMLElement {
    * @param {string} new_value - New attribute value
    */
   attributeChangedCallback(name, old_value, new_value) {
-    switch(name) {
-      case 'contrast':
+    switch (name) {
+      case "contrast":
         this.contrast = parseInt(new_value) || DEFAULT_VALUES.CONTRAST;
-        this.uiManager.updateSlider('contrast', this.contrast);
+        this.uiManager.updateSlider("contrast", this.contrast);
         break;
-      case 'saturation':
+      case "saturation":
         this.saturation = parseInt(new_value) || DEFAULT_VALUES.SATURATION;
-        this.uiManager.updateSlider('saturation', this.saturation);
+        this.uiManager.updateSlider("saturation", this.saturation);
         break;
-      case 'brightness':
+      case "brightness":
         this.brightness = parseInt(new_value) || DEFAULT_VALUES.BRIGHTNESS;
-        this.uiManager.updateSlider('brightness', this.brightness);
+        this.uiManager.updateSlider("brightness", this.brightness);
         break;
-      case 'hue':
+      case "hue":
         this.hue = parseInt(new_value) || DEFAULT_VALUES.HUE;
-        this.uiManager.updateSlider('hue', this.hue);
+        this.uiManager.updateSlider("hue", this.hue);
         break;
-      case 'color-1':
+      case "color-1":
         this.color1 = new_value || DEFAULT_VALUES.COLOR_1;
         if (this.imageProcessor) {
-          this.imageProcessor.setPalette(this.color1, this.color2, this.color3, this.color4, this.color5);
+          this.imageProcessor.setPalette(
+            this.color1,
+            this.color2,
+            this.color3,
+            this.color4,
+            this.color5,
+          );
         }
         break;
-      case 'color-2':
+      case "color-2":
         this.color2 = new_value || DEFAULT_VALUES.COLOR_2;
         if (this.imageProcessor) {
-          this.imageProcessor.setPalette(this.color1, this.color2, this.color3, this.color4, this.color5);
+          this.imageProcessor.setPalette(
+            this.color1,
+            this.color2,
+            this.color3,
+            this.color4,
+            this.color5,
+          );
         }
         break;
-      case 'color-3':
+      case "color-3":
         this.color3 = new_value || DEFAULT_VALUES.COLOR_3;
         if (this.imageProcessor) {
-          this.imageProcessor.setPalette(this.color1, this.color2, this.color3, this.color4, this.color5);
+          this.imageProcessor.setPalette(
+            this.color1,
+            this.color2,
+            this.color3,
+            this.color4,
+            this.color5,
+          );
         }
         break;
-      case 'color-4':
+      case "color-4":
         this.color4 = new_value || DEFAULT_VALUES.COLOR_4;
         if (this.imageProcessor) {
-          this.imageProcessor.setPalette(this.color1, this.color2, this.color3, this.color4, this.color5);
+          this.imageProcessor.setPalette(
+            this.color1,
+            this.color2,
+            this.color3,
+            this.color4,
+            this.color5,
+          );
         }
         break;
-      case 'color-5':
+      case "color-5":
         this.color5 = new_value || DEFAULT_VALUES.COLOR_5;
         if (this.imageProcessor) {
-          this.imageProcessor.setPalette(this.color1, this.color2, this.color3, this.color4, this.color5);
+          this.imageProcessor.setPalette(
+            this.color1,
+            this.color2,
+            this.color3,
+            this.color4,
+            this.color5,
+          );
         }
         break;
-      case 'dither-method':
+      case "dither-method":
         this.dither_method = new_value || DEFAULT_VALUES.DITHER_METHOD;
         if (this.imageProcessor) {
           this.imageProcessor.setDitherMethod(this.dither_method);
         }
         this.uiManager.updateDitherMethod(this.dither_method);
+        break;
+      case "width-value":
+        this.width_value = parseFloat(new_value) || DEFAULT_VALUES.WIDTH_VALUE;
+        if (this.uiManager) {
+          this.uiManager.updateSizeSelector(
+            this.width_value,
+            this.height_value,
+            this.size_unit,
+          );
+        }
+        // Recalculate eye_width
+        this.eye_width = convertToPixels(
+          this.width_value,
+          this.size_unit,
+          this.dpi,
+        );
+        this.resizeCanvases();
+        break;
+      case "height-value":
+        this.height_value =
+          parseFloat(new_value) || DEFAULT_VALUES.HEIGHT_VALUE;
+        if (this.uiManager) {
+          this.uiManager.updateSizeSelector(
+            this.width_value,
+            this.height_value,
+            this.size_unit,
+          );
+        }
+        // Recalculate eye_height
+        this.eye_height = convertToPixels(
+          this.height_value,
+          this.size_unit,
+          this.dpi,
+        );
+        this.resizeCanvases();
+        break;
+      case "size-unit":
+        this.size_unit = new_value || DEFAULT_VALUES.SIZE_UNIT;
+        if (this.uiManager) {
+          this.uiManager.updateSizeSelector(
+            this.width_value,
+            this.height_value,
+            this.size_unit,
+          );
+        }
+        // Recalculate eye dimensions
+        this.eye_width = convertToPixels(
+          this.width_value,
+          this.size_unit,
+          this.dpi,
+        );
+        this.eye_height = convertToPixels(
+          this.height_value,
+          this.size_unit,
+          this.dpi,
+        );
+        this.resizeCanvases();
         break;
       default:
         // Unhandled attribute
@@ -507,4 +735,4 @@ class EYE extends HTMLElement {
  * Register the custom element
  * - 'EYE' represents the camera/vision aspect of the component
  */
-customElements.define('e-y-e', EYE);
+customElements.define("e-y-e", EYE);
